@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"image"
 	"net/http"
 )
 
@@ -37,6 +38,7 @@ type beer struct {
 	LabelUrl        string
 	Brewery         brewery
 	Style           style
+	ImageData       image.Image
 }
 
 type brewery struct {
@@ -45,6 +47,7 @@ type brewery struct {
 	BreweryDescription string
 	Image              string
 	Website            string
+	ImageData          image.Image
 }
 
 type style struct {
@@ -77,7 +80,31 @@ func getKegs(baseUrl string, taps []tap) []keg {
 		var k kegResponse
 		json.NewDecoder(res.Body).Decode(&k)
 		k.Keg.Tap = t
+		k.Keg.Beer.getBeerImage()
+		k.Keg.Beer.Brewery.getKegImage()
 		kegs = append(kegs, k.Keg)
 	}
 	return kegs
+}
+
+func (b *brewery) getKegImage() {
+	b.ImageData = getImage(b.Image)
+}
+
+func (b *beer) getBeerImage() {
+	b.ImageData = getImage(b.LabelUrl)
+}
+
+func getImage(url string) image.Image {
+	res, err := http.Get(url)
+	if err != nil {
+		//could be any random problem, just give up
+		return nil
+	}
+	defer res.Body.Close()
+	i, _, err := image.Decode(res.Body)
+	if err != nil {
+		return nil
+	}
+	return i
 }
