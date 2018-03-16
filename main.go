@@ -64,8 +64,6 @@ func layout(g *gocui.Gui) error {
 			v.Editable = false
 			v.Wrap = true
 			populateKegInfo(v, k)
-		} else {
-			populateKegInfo(v, k)
 		}
 		//Fill meter
 		if v, err := g.SetView(volumeKey(k), 0, maxY-int((float64(maxY)*0.1)), maxX-1, maxY-1); err != nil {
@@ -78,11 +76,10 @@ func layout(g *gocui.Gui) error {
 			v.Wrap = false
 			v.FgColor = gocui.ColorGreen
 			populateVolumeInfo(v, k)
-		} else {
-			populateVolumeInfo(v, k)
 		}
 		//Image
-		if v, err := g.SetView(imageKey(k), maxX/6, maxY-int((float64(maxY)*0.7)), maxX-1, maxY-int((float64(maxY)*0.1))-1); err != nil {
+		v, err := g.SetView(imageKey(k), maxX/6, maxY-int((float64(maxY)*0.7)), maxX-1, maxY-int((float64(maxY)*0.1))-1)
+		if err != nil {
 			if err != gocui.ErrUnknownView {
 				return err
 			}
@@ -90,10 +87,8 @@ func layout(g *gocui.Gui) error {
 			v.Editable = false
 			v.Wrap = false
 			v.FgColor = gocui.ColorWhite
-			populateImage(v, k)
-		} else {
-			populateImage(v, k)
 		}
+		populateImage(v, k)
 	}
 	//Tap List
 	if v, err := g.SetView("TapList", 0, 0, maxX/6-1, maxY-int((float64(maxY)*0.1))-1); err != nil {
@@ -101,7 +96,7 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "Taps"
-		v.Autoscroll = false
+		v.Autoscroll = true
 		v.Editable = false
 		v.Wrap = true
 	}
