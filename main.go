@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/TylerReid/kask-cli/kask"
 	"github.com/fatih/color"
@@ -33,6 +34,7 @@ func main() {
 
 	g.Highlight = true
 	g.SelFgColor = gocui.ColorGreen
+	g.BgColor = gocui.ColorBlack
 	g.SetManagerFunc(layout)
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
@@ -63,6 +65,8 @@ func layout(g *gocui.Gui) error {
 			v.Autoscroll = false
 			v.Editable = false
 			v.Wrap = true
+			//set FgColor to bold to let us handle colors with color codes. Should look into lib PR to make this not dumb
+			v.FgColor = gocui.AttrBold
 			populateKegInfo(v, k)
 		}
 		//Fill meter
@@ -86,7 +90,7 @@ func layout(g *gocui.Gui) error {
 			v.Autoscroll = false
 			v.Editable = false
 			v.Wrap = false
-			v.FgColor = gocui.ColorWhite
+			v.FgColor = gocui.AttrBold
 		}
 		populateImage(v, k)
 	}
@@ -99,6 +103,7 @@ func layout(g *gocui.Gui) error {
 		v.Autoscroll = true
 		v.Editable = false
 		v.Wrap = true
+		v.FgColor = gocui.AttrBold
 	}
 
 	if err := setCurrentWindow(g); err != nil {
@@ -148,7 +153,7 @@ func setCurrentWindow(g *gocui.Gui) error {
 	v.Clear()
 	for i, k := range kegs {
 		if i == currentView {
-			color.New(color.BgGreen, color.FgHiWhite).Fprintf(v, "%v\n", k.Keg.Beer.BeerName)
+			color.New(color.BgGreen, color.FgWhite).Fprintf(v, "%v\n", k.Keg.Beer.BeerName)
 		} else {
 			fmt.Fprintln(v, k.Keg.Beer.BeerName)
 		}
@@ -157,14 +162,20 @@ func setCurrentWindow(g *gocui.Gui) error {
 }
 
 func populateKegInfo(v *gocui.View, k kask.KegOnTap) {
+	x, _ := v.Size()
+	dividerString := strings.Repeat("~", x)
 	v.Clear()
-	fmt.Println()
+	color.New(color.FgRed).Fprintf(v, "%v\n", dividerString)
 	fmt.Fprintf(v, "%v\n", k.Keg.Beer.BeerName)
 	fmt.Fprintf(v, "%v\n\n", k.Keg.Beer.Brewery.BreweryName)
-	fmt.Fprintf(v, "%v Barrel\n\n", k.Keg.Size)
-	fmt.Fprint(v, "~~~~~~~~~~~~~~~~*~~~~~~~~~~~~~~~~\n\n")
+	ratingSign := ""
+	if k.NetVote > 0 {
+		ratingSign = "+"
+	}
+	fmt.Fprintf(v, "%v Barrel %v ABV %v%v Rating\n\n", k.Keg.Size, k.Keg.Beer.ABV, ratingSign, k.NetVote)
+	color.New(color.FgRed).Fprintf(v, "%v\n", dividerString)
 	fmt.Fprintf(v, "%v\n\n", k.Keg.Beer.BeerDescription)
-	fmt.Fprintf(v, "%v\n\n", k.Keg.Beer.Brewery.Website)
+	color.New(color.FgCyan).Fprintf(v, "%v\n\n", k.Keg.Beer.Brewery.Website)
 }
 
 func populateVolumeInfo(v *gocui.View, k kask.KegOnTap) {
