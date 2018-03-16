@@ -5,25 +5,23 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/TylerReid/kask-cli/kask"
 	"github.com/fatih/color"
 	"github.com/jroimartin/gocui"
 	"github.com/zyxar/image2ascii/ascii"
 )
 
-var kaskUrl string
-var taps []tap
-var kegs []keg
+var kaskApi kask.Kask
+var kegs []kask.KegOnTap
 
 func main() {
-	kaskUrl = *flag.String("kaskurl", "https://kask.kabbage.com/api", "kask api url")
+	kaskUrl := *flag.String("kaskurl", "https://kask.kabbage.com/api", "kask api url")
 
-	taps = getTaps(kaskUrl)
-	if len(taps) == 0 {
-		log.Panicln("No Taps! ☹️")
-	}
+	kaskApi = kask.Kask{Url: kaskUrl}
 
-	kegs = getKegs(kaskUrl, taps)
-	if len(kegs) == 0 {
+	var err error
+	kegs, err = kaskApi.GetBeersOnTap()
+	if err != nil || len(kegs) == 0 {
 		log.Panicln("No Kegs! ☹️")
 	}
 
@@ -56,18 +54,18 @@ func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
 	for _, k := range kegs {
-		if v, err := g.SetView(string(k.KegId), maxX/6, 0, maxX-1, maxY-int((float64(maxY)*0.7))-1); err != nil {
+		if v, err := g.SetView(viewKey(k), maxX/6, 0, maxX-1, maxY-int((float64(maxY)*0.7))-1); err != nil {
 			if err != gocui.ErrUnknownView {
 				return err
 			}
-			v.Title = k.Tap.Description
+			v.Title = k.Keg.Tap.Description
 			v.Autoscroll = true
 			v.Editable = false
 			v.Wrap = true
 			populateKegInfo(v, k)
 		}
 
-		if v, err := g.SetView(string(k.KegId)+"volume", maxX/6, maxY-int((float64(maxY)*0.1)), maxX-1, maxY-1); err != nil {
+		if v, err := g.SetView(volumeKey(k), maxX/6, maxY-int((float64(maxY)*0.1)), maxX-1, maxY-1); err != nil {
 			if err != gocui.ErrUnknownView {
 				return err
 			}
@@ -79,7 +77,7 @@ func layout(g *gocui.Gui) error {
 			populateVolumeInfo(v, k)
 		}
 
-		if v, err := g.SetView(string(k.KegId)+"image", maxX/6, maxY-int((float64(maxY)*0.7)), maxX-1, maxY-int((float64(maxY)*0.1))-1); err != nil {
+		if v, err := g.SetView(imageKey(k), maxX/6, maxY-int((float64(maxY)*0.7)), maxX-1, maxY-int((float64(maxY)*0.1))-1); err != nil {
 			if err != gocui.ErrUnknownView {
 				return err
 			}
@@ -133,13 +131,13 @@ func switchWindowUp(g *gocui.Gui, v *gocui.View) error {
 }
 
 func setCurrentWindow(g *gocui.Gui) error {
-	_, err := g.SetCurrentView(string(kegs[currentView].KegId))
+	_, err := g.SetCurrentView(viewKey(kegs[currentView]))
 	if err != nil {
 		return err
 	}
-	_, err = g.SetViewOnTop(string(kegs[currentView].KegId))
-	_, err = g.SetViewOnTop(string(kegs[currentView].KegId) + "volume")
-	_, err = g.SetViewOnTop(string(kegs[currentView].KegId) + "image")
+	_, err = g.SetViewOnTop(viewKey(kegs[currentView]))
+	_, err = g.SetViewOnTop(volumeKey(kegs[currentView]))
+	_, err = g.SetViewOnTop(imageKey(kegs[currentView]))
 
 	v, err := g.View("TapList")
 	if err != nil {
@@ -148,29 +146,29 @@ func setCurrentWindow(g *gocui.Gui) error {
 	v.Clear()
 	for i, k := range kegs {
 		if i == currentView {
-			color.New(color.BgGreen, color.FgHiWhite).Fprintf(v, "%v\n", k.Beer.BeerName)
+			color.New(color.BgGreen, color.FgHiWhite).Fprintf(v, "%v\n", k.Keg.Beer.BeerName)
 		} else {
-			fmt.Fprintln(v, k.Beer.BeerName)
+			fmt.Fprintln(v, k.Keg.Beer.BeerName)
 		}
 	}
 	return nil
 }
 
-func populateKegInfo(v *gocui.View, k keg) {
+func populateKegInfo(v *gocui.View, k kask.KegOnTap) {
 	v.Clear()
 	fmt.Println()
-	fmt.Fprintf(v, "%v\n", k.Beer.BeerName)
-	fmt.Fprintf(v, "%v\n\n", k.Beer.Brewery.BreweryName)
-	fmt.Fprintf(v, "%v Barrel\n\n", k.Size)
+	fmt.Fprintf(v, "%v\n", k.Keg.Beer.BeerName)
+	fmt.Fprintf(v, "%v\n\n", k.Keg.Beer.Brewery.BreweryName)
+	fmt.Fprintf(v, "%v Barrel\n\n", k.Keg.Size)
 	fmt.Fprint(v, "~~~~~~~~~~~~~~~~*~~~~~~~~~~~~~~~~\n\n")
-	fmt.Fprintf(v, "%v\n\n", k.Beer.BeerDescription)
-	fmt.Fprintf(v, "%v\n\n", k.Beer.Brewery.Website)
+	fmt.Fprintf(v, "%v\n\n", k.Keg.Beer.BeerDescription)
+	fmt.Fprintf(v, "%v\n\n", k.Keg.Beer.Brewery.Website)
 }
 
-func populateVolumeInfo(v *gocui.View, k keg) {
+func populateVolumeInfo(v *gocui.View, k kask.KegOnTap) {
 	v.Clear()
 	maxWidth, _ := v.Size()
-	percentLeft := k.RemovedVolume / k.InitialVolume
+	percentLeft := k.Keg.RemovedVolume / k.Keg.InitialVolume
 	fillLevel := maxWidth - int(float64(maxWidth)*percentLeft)
 	for i := 0; i < maxWidth; i++ {
 		if i < fillLevel {
@@ -181,14 +179,26 @@ func populateVolumeInfo(v *gocui.View, k keg) {
 	}
 }
 
-func populateImage(v *gocui.View, k keg) {
+func populateImage(v *gocui.View, k kask.KegOnTap) {
 	v.Clear()
 	x, y := v.Size()
-	if k.Beer.Brewery.ImageData != nil {
-		ascii.Encode(v, k.Beer.Brewery.ImageData, ascii.Options{Width: x, Height: y})
+	if k.Keg.Beer.Brewery.ImageData != nil {
+		ascii.Encode(v, k.Keg.Beer.Brewery.ImageData, ascii.Options{Width: x, Height: y})
 	}
 }
 
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
+}
+
+func viewKey(k kask.KegOnTap) string {
+	return string(k.Keg.KegId)
+}
+
+func volumeKey(k kask.KegOnTap) string {
+	return string(k.Keg.KegId) + "volume"
+}
+
+func imageKey(k kask.KegOnTap) string {
+	return string(k.Keg.KegId) + "image"
 }
