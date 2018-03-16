@@ -23,7 +23,8 @@ func main() {
 	var err error
 	kegs, err = kaskApi.GetBeersOnTap()
 	if err != nil || len(kegs) == 0 {
-		log.Panicln("No Kegs! ☹️")
+		fmt.Println("No Kegs! ☹️")
+		return
 	}
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
