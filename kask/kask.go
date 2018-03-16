@@ -46,6 +46,9 @@ func getKegs(baseUrl string, taps []Tap) ([]KegOnTap, error) {
 		defer res.Body.Close()
 		var k KegOnTap
 		json.NewDecoder(res.Body).Decode(&k)
+		if k.Active == 0 {
+			continue
+		}
 		k.Keg.Tap = t
 		k.Keg.Beer.getBeerImage()
 		k.Keg.Beer.Brewery.getKegImage()
